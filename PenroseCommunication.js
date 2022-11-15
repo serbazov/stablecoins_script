@@ -25,7 +25,7 @@ async function gasPriceAwaiter() {
   return gasPrice;
 }
 
-async function depositLpAndStake(wallet) {
+async function depositLpAndStake(wallet, PoolToken) {
   let gasPrice = await gasPriceAwaiter();
   //approveToken(PoolToken, PenroseProxy, wallet);
   const PenroseCommunication = new ethers.Contract(
@@ -36,7 +36,7 @@ async function depositLpAndStake(wallet) {
   const penroseContract = PenroseCommunication.connect(wallet);
 
   return await penroseContract
-    .depositLpAndStake(DystopiaPoolAddress, {
+    .depositLpAndStake(PoolToken, {
       gasPrice: gasPrice,
       gasLimit: BigNumber.from("5000000"),
     })
@@ -45,7 +45,7 @@ async function depositLpAndStake(wallet) {
     });
 }
 
-async function unstakeLpWithdrawAndClaim(wallet) {
+async function unstakeLpWithdrawAndClaim(wallet, PoolToken) {
   let gasPrice = await gasPriceAwaiter();
   //approveToken(PoolToken, PenroseProxy, wallet);
 
@@ -57,7 +57,7 @@ async function unstakeLpWithdrawAndClaim(wallet) {
   const penroseContract = PenroseCommunication.connect(wallet);
 
   return await penroseContract
-    .unstakeLpWithdrawAndClaim(DystopiaPoolAddress, {
+    .unstakeLpWithdrawAndClaim(PoolToken, {
       gasPrice: gasPrice,
       gasLimit: BigNumber.from("5000000"),
     })

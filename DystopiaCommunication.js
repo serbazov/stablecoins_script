@@ -29,15 +29,15 @@ const FeesRewardContract =
 
 const fetch = require("node-fetch"); // node-fetch@1.7.3
 
-// const Tocken1 = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174".toLowerCase(); // Usdc
-// const Tocken2 = "0x236eeC6359fb44CCe8f97E99387aa7F8cd5cdE1f".toLowerCase(); // Usd+
-// const PoolToken = "0x421a018cC5839c4C0300AfB21C725776dc389B1a".toLowerCase(); //Usd+/Usdc pool token
+const Tocken1 = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174".toLowerCase(); // Usdc
+const Tocken2 = "0x236eeC6359fb44CCe8f97E99387aa7F8cd5cdE1f".toLowerCase(); // Usd+
+const PoolToken = "0x421a018cC5839c4C0300AfB21C725776dc389B1a".toLowerCase(); //Usd+/Usdc pool token
 
-const PoolToken = "0x60c088234180b36edcec7aa8aa23912bb6bed114".toLowerCase(); //Usdc/Wmatic pool token
+//const PoolToken = "0x60c088234180b36edcec7aa8aa23912bb6bed114".toLowerCase(); //Usdc/Wmatic pool token
 
-const Tocken1 = "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270".toLowerCase(); //Wmatic
-const TOCKEN1DECIMALS = 18;
-const Tocken2 = "0x2791bca1f2de4661ed88a30c99a7a9449aa84174".toLowerCase(); //Usdc
+//const Tocken1 = "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270".toLowerCase(); //Wmatic
+const TOCKEN1DECIMALS = 6;
+//const Tocken2 = "0x2791bca1f2de4661ed88a30c99a7a9449aa84174".toLowerCase(); //Usdc
 const TOCKEN2DECIMALS = 6;
 
 async function calcLPTokensValue(
