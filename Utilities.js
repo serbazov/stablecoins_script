@@ -6,6 +6,10 @@ const web3Provider = new ethers.providers.StaticJsonRpcProvider(
   "https://polygon-mainnet.g.alchemy.com/v2/6aCuWP8Oxcd-4jvmNYLh-WervViwIeJq",
   ChainId.polygon
 );
+const web3ProviderOptimism = new ethers.providers.StaticJsonRpcProvider(
+  "https://opt-mainnet.g.alchemy.com/v2/p3FBKCzASs2csAWsjCUpAIPNoMCoiB32",
+  ChainId.optimism
+);
 const DystopiaRouterABI = require("./abi/RouterABI.json");
 const ERC20ABI = require("./abi/ERC20ABI.json");
 const DystopiaRouterAddress =
@@ -41,10 +45,25 @@ async function getCurrentPrice(
   );
 }
 
-async function getTokenBalanceWallet(TokenAddress, WALLET_ADDRESS) {
-  const Token = new ethers.Contract(TokenAddress, ERC20ABI, web3Provider);
-  tokenBalance = await Token.balanceOf(WALLET_ADDRESS);
-  return tokenBalance;
+async function getTokenBalanceWallet(
+  TokenAddress,
+  WALLET_ADDRESS,
+  network = "polygon"
+) {
+  if (network == "polygon") {
+    const Token = new ethers.Contract(TokenAddress, ERC20ABI, web3Provider);
+    const tokenBalance = await Token.balanceOf(WALLET_ADDRESS);
+    return tokenBalance;
+  }
+  if (network == "optimism") {
+    const Token = new ethers.Contract(
+      TokenAddress,
+      ERC20ABI,
+      web3ProviderOptimism
+    );
+    const tokenBalance = await Token.balanceOf(WALLET_ADDRESS);
+    return tokenBalance;
+  }
 }
 async function getTotalTokenSupply(TokenAddress) {
   const Token = new ethers.Contract(TokenAddress, ERC20ABI, web3Provider);
@@ -52,23 +71,47 @@ async function getTotalTokenSupply(TokenAddress) {
   return totalSupply;
 }
 
-async function approveToken(TokenAddress, ContractAddress, ConnectedWallet) {
-  const tokenContract = new ethers.Contract(
-    TokenAddress,
-    ERC20ABI,
-    web3Provider
-  );
-  const gasPrice = await getGasPrice();
-  await tokenContract
-    .connect(ConnectedWallet)
-    .approve(ContractAddress, ethers.constants.MaxUint256, {
-      gasPrice: gasPrice,
-      gasLimit: BigNumber.from("1000000"),
-    })
-    .then(function (transaction) {
-      return transaction.wait();
-    });
+async function approveToken(
+  TokenAddress,
+  ContractAddress,
+  ConnectedWallet,
+  network = "polygon"
+) {
+  if (network == "polygon") {
+    const tokenContract = new ethers.Contract(
+      TokenAddress,
+      ERC20ABI,
+      web3Provider
+    );
+    const gasPrice = await getGasPrice();
+    await tokenContract
+      .connect(ConnectedWallet)
+      .approve(ContractAddress, ethers.constants.MaxUint256, {
+        gasPrice: gasPrice,
+        gasLimit: BigNumber.from("1000000"),
+      })
+      .then(function (transaction) {
+        return transaction.wait();
+      });
+  }
+  if (network == "optimism") {
+    const tokenContract = new ethers.Contract(
+      TokenAddress,
+      ERC20ABI,
+      web3ProviderOptimism
+    );
+    await tokenContract
+      .connect(ConnectedWallet)
+      .approve(ContractAddress, ethers.constants.MaxUint256, {
+        gasPrice: "5000000",
+        gasLimit: "6000000",
+      })
+      .then(function (transaction) {
+        return transaction.wait();
+      });
+  }
 }
+
 module.exports = {
   getGasPrice,
   getTokenBalanceWallet,
