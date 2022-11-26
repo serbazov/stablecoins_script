@@ -73,7 +73,7 @@ async function claimVeloReward(wallet, WALLET_ADDRESS) {
     });
 }
 
-async function swapToken1ToToken2(
+async function swapToken1ToToken2velo(
   Token1address,
   Token2address,
   amount,
@@ -102,31 +102,32 @@ async function swapToken1ToToken2(
       false,
       WALLET_ADDRESS,
       currentTimestamp + 60,
-      { gasPrice: "7000000", gasLimit: "8000000" }
+      { gasPrice: "5000000", gasLimit: "6000000" }
     )
     .then(function (transaction) {
       return transaction.wait();
     });
 }
 
-async function runVelodrome(args) {
-  const WALLET_ADDRESS = args[0];
-  const WALLET_SECRET = args[1];
-  const wallet = new ethers.Wallet(WALLET_SECRET, web3Provider);
-  //await claimVeloReward(wallet, WALLET_ADDRESS);
-  const amount = await getTokenBalanceWallet(
-    VeloToken,
-    WALLET_ADDRESS,
-    "optimism"
-  );
-  await swapToken1ToToken2(
-    VeloToken,
-    UsdcToken,
-    amount,
-    wallet,
-    WALLET_ADDRESS
-  );
-}
+// async function runVelodrome(args) {
+//   const WALLET_ADDRESS = args[0];
+//   const WALLET_SECRET = args[1];
+//   const wallet = new ethers.Wallet(WALLET_SECRET, web3Provider);
+//   await claimVeloReward(wallet, WALLET_ADDRESS);
+//   const amount = await getTokenBalanceWallet(
+//     VeloToken,
+//     WALLET_ADDRESS,
+//     "optimism"
+//   );
+//   await swapToken1ToToken2velo(
+//     VeloToken,
+//     UsdcToken,
+//     amount,
+//     wallet,
+//     WALLET_ADDRESS
+//   );
+// }
 
-runVelodrome(args);
+// runVelodrome(args);
 //allApproves(args);
+module.exports = { swapToken1ToToken2velo, claimVeloReward };
