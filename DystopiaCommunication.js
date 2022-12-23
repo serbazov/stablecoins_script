@@ -94,20 +94,19 @@ async function swapToken1ToToken2(
   );
   const gasPrice = await getGasPrice();
   const dystopiarouterContract = dystopiarouter.connect(wallet);
-  const ExpectedAmount = await dystopiarouterContract.getExactAmountOut(
+  const BestChange = await dystopiarouterContract.getAmountOut(
     amount,
     Token1address,
-    Token2address,
-    true
+    Token2address
   );
   const currentTimestamp = Date.now();
   await dystopiarouterContract
     .swapExactTokensForTokensSimple(
       amount,
-      ExpectedAmount,
+      BestChange.amount,
       Token1address,
       Token2address,
-      true,
+      BestChange.stable,
       WALLET_ADDRESS,
       currentTimestamp + 60,
       { gasPrice: gasPrice, gasLimit: BigNumber.from("500000") }

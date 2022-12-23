@@ -10,6 +10,16 @@ const web3ProviderOptimism = new ethers.providers.StaticJsonRpcProvider(
   "https://opt-mainnet.g.alchemy.com/v2/p3FBKCzASs2csAWsjCUpAIPNoMCoiB32",
   ChainId.optimism
 );
+const providerURL =
+  "https://moonriver.blastapi.io/81a966d1-5645-4eba-a0e0-d701ad03d79a";
+const web3ProviderMoonriver = new ethers.providers.StaticJsonRpcProvider(
+  providerURL,
+  {
+    chainId: 1285,
+    name: "moonriver",
+  }
+);
+
 const DystopiaRouterABI = require("./abi/RouterABI.json");
 const ERC20ABI = require("./abi/ERC20ABI.json");
 const DystopiaRouterAddress =
@@ -64,6 +74,15 @@ async function getTokenBalanceWallet(
     const tokenBalance = await Token.balanceOf(WALLET_ADDRESS);
     return tokenBalance;
   }
+  if (network == "moonriver") {
+    const Token = new ethers.Contract(
+      TokenAddress,
+      ERC20ABI,
+      web3ProviderMoonriver
+    );
+    const tokenBalance = await Token.balanceOf(WALLET_ADDRESS);
+    return tokenBalance;
+  }
 }
 async function getTotalTokenSupply(TokenAddress) {
   const Token = new ethers.Contract(TokenAddress, ERC20ABI, web3Provider);
@@ -105,6 +124,21 @@ async function approveToken(
       .approve(ContractAddress, ethers.constants.MaxUint256, {
         gasPrice: "5000000",
         gasLimit: "6000000",
+      })
+      .then(function (transaction) {
+        return transaction.wait();
+      });
+  }
+  if (network == "moonriver") {
+    const tokenContract = new ethers.Contract(
+      TokenAddress,
+      ERC20ABI,
+      web3ProviderMoonriver
+    );
+    await tokenContract
+      .connect(ConnectedWallet)
+      .approve(ContractAddress, ethers.constants.MaxUint256, {
+        gasLimit: "500000",
       })
       .then(function (transaction) {
         return transaction.wait();

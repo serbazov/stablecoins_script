@@ -8,12 +8,23 @@ const web3ProviderOpt = new ethers.providers.StaticJsonRpcProvider(
   "https://opt-mainnet.g.alchemy.com/v2/p3FBKCzASs2csAWsjCUpAIPNoMCoiB32",
   ChainId.optimism
 );
+const providerURL =
+  "https://moonriver.blastapi.io/81a966d1-5645-4eba-a0e0-d701ad03d79a";
+const web3ProviderMoon = new ethers.providers.StaticJsonRpcProvider(
+  providerURL,
+  {
+    chainId: 1285,
+    name: "moonriver",
+  }
+);
 const { GoogleSpreadsheet } = require("google-spreadsheet");
 const {
   getTokenBalanceWallet,
   getCurrentPrice,
   approveToken,
 } = require("./Utilities");
+const { swapMFAM, swapMovr } = require("./SolarbeamCommunication");
+const { ClaimReward } = require("./MoonwellCommunication");
 const doc = new GoogleSpreadsheet(
   "1jp8CdsTwO--563iN3IIJmJd6X6t5DQ8leMwGlXbJ-Yc"
 );
@@ -35,6 +46,8 @@ const UsdcOptToken = "0x7F5c764cBc14f9669B88837ca1490cCa17c31607".toLowerCase();
 const PoolToken = "0x421a018cC5839c4C0300AfB21C725776dc389B1a".toLowerCase(); //Usd+/Usdc pool token
 const MaticAddress = "0x0000000000000000000000000000000000001010".toLowerCase();
 const EthAddress = "0x4200000000000000000000000000000000000042".toLowerCase();
+const MFAMToken = "0xBb8d88bcD9749636BC4D2bE22aaC4Bb3B01A58F1".toLowerCase();
+const SolarRouter = "0xAA30eF758139ae4a7f798112902Bf6d65612045f".toLowerCase();
 const DystopiaRouterABI = require("./abi/RouterABI.json");
 const { swapToken1ToToken2 } = require("./DystopiaCommunication");
 const {
@@ -64,10 +77,12 @@ async function allApproves(args) {
   const WALLET_SECRET = args[0];
   const wallet = new ethers.Wallet(WALLET_SECRET, web3Provider);
   const optWallet = new ethers.Wallet(WALLET_SECRET, web3ProviderOpt);
+  const MoonWallet = new ethers.Wallet(WALLET_SECRET, web3ProviderMoon);
   await approveToken(WmaticAddress, DystopiaRouterAddress, wallet);
   await approveToken(PenAddress, DystopiaRouterAddress, wallet);
   await approveToken(DystAddress, DystopiaRouterAddress, wallet);
   await approveToken(VeloToken, VelodromeRouter, optWallet, "optimism");
+  await approveToken(MFAMToken, SolarRouter, MoonWallet, "moonriver");
 }
 
 async function runBot(args) {
@@ -76,6 +91,7 @@ async function runBot(args) {
   const WALLET_SECRET = args[2];
   const wallet = new ethers.Wallet(WALLET_SECRET, web3Provider);
   const walletOpt = new ethers.Wallet(WALLET_SECRET, web3ProviderOpt);
+  const walletMoon = new ethers.Wallet(WALLET_SECRET, web3ProviderMoon);
   await doc.useServiceAccountAuth(creds);
   const sheet = await doc.addSheet({
     headerValues: [
@@ -85,6 +101,8 @@ async function runBot(args) {
       "MaticGasSpent",
       "VelodromeUSDCClaimed",
       "EthGasSpent",
+      "MoonriverMFAMClaimed",
+      "MoonriverMOVRIncome",
     ],
   });
 
@@ -100,11 +118,15 @@ async function runBot(args) {
       WALLET_ADDRESS,
       "optimism"
     );
+
     const MaticInit = await getTokenBalanceWallet(MaticAddress, WALLET_ADDRESS);
     const EthInit = await web3ProviderOpt.getBalance(WALLET_ADDRESS);
+    const MOVRbalance = await web3ProviderMoon.getBalance(WALLET_ADDRESS);
+    await ClaimReward(walletMoon, WALLET_ADDRESS);
     await unstakeLpWithdrawAndClaim(wallet, PoolToken);
     await claimVeloReward(walletOpt, WALLET_ADDRESS);
     await timer(1000 * 60 * 5);
+    const MOVRbalance2 = await web3ProviderMoon.getBalance(WALLET_ADDRESS);
     console.log("LP unstaked");
     const amountDyst = await getTokenBalanceWallet(DystAddress, WALLET_ADDRESS);
     const amountPen = await getTokenBalanceWallet(PenAddress, WALLET_ADDRESS);
@@ -112,6 +134,11 @@ async function runBot(args) {
       VeloToken,
       WALLET_ADDRESS,
       "optimism"
+    );
+    const amountMFAM = await getTokenBalanceWallet(
+      MFAMToken,
+      WALLET_ADDRESS,
+      "moonriver"
     );
     await swapToken1ToToken2velo(
       VeloToken,
@@ -145,7 +172,11 @@ async function runBot(args) {
       wallet,
       WALLET_ADDRESS
     );
-
+    const MovrSwap = MOVRbalance2.sub(MOVRbalance);
+    await swapMFAM(walletMoon, WALLET_ADDRESS);
+    if (MovrSwap.gt(0)) {
+      await swapMovr(walletMoon, MovrSwap);
+    }
     await depositLpAndStake(wallet, PoolToken);
     const UsdcEndPolygon = await getTokenBalanceWallet(
       UsdcAddress,
@@ -166,6 +197,8 @@ async function runBot(args) {
       MaticGasSpent: (MaticInit - MaticEnd) / 10 ** WmaticDecimals,
       VelodromeUSDCClaimed: (UsdcEndOpt - UsdcInitOpt) / 10 ** UsdcDecimals,
       EthGasSpent: (EthInit - EthEnd) / 10 ** EthDecimals,
+      MoonriverMFAMClaimed: amountMFAM / 10 ** 18,
+      MoonriverMOVRIncome: MovrSwap / 10 ** 18,
     });
   }
 }
