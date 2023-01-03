@@ -11,7 +11,7 @@ const {
   getGasPrice,
   getTokenBalanceWallet,
   getTotalTokenSupply,
-  approveToken,
+  errCatcher,
 } = require("./Utilities");
 const web3Provider = new ethers.providers.StaticJsonRpcProvider(
   "https://polygon-mainnet.g.alchemy.com/v2/6aCuWP8Oxcd-4jvmNYLh-WervViwIeJq",
@@ -26,7 +26,11 @@ const DYSTRewardContract =
   "0x719BfE5213AF9c2523E9f46b86cc70EB8b7F530F".toLowerCase();
 const FeesRewardContract =
   "0x421a018cC5839c4C0300AfB21C725776dc389B1a".toLowerCase();
-
+const UsdcAddress = "0x2791bca1f2de4661ed88a30c99a7a9449aa84174".toLowerCase(); //Usdc
+const WmaticAddress =
+  "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270".toLowerCase(); //Wmatic
+const PenAddress = "0x9008D70A5282a936552593f410AbcBcE2F891A97".toLowerCase();
+const DystAddress = "0x39aB6574c289c3Ae4d88500eEc792AB5B947A5Eb".toLowerCase();
 const fetch = require("node-fetch"); // node-fetch@1.7.3
 
 const Tocken1 = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174".toLowerCase(); // Usdc
@@ -40,11 +44,13 @@ const TOCKEN1DECIMALS = 6;
 //const Tocken2 = "0x2791bca1f2de4661ed88a30c99a7a9449aa84174".toLowerCase(); //Usdc
 const TOCKEN2DECIMALS = 6;
 
-async function calcLPTokensValue(
-  LPTokenAddress,
-  dystopiarouterContract,
-  WALLET_ADDRESS
-) {
+async function calcLPTokensValue(LPTokenAddress, WALLET_ADDRESS) {
+  const dystopiarouter = new ethers.Contract(
+    DystopiaRouterAddress,
+    DystopiaRouterABI,
+    web3Provider
+  );
+  const dystopiarouterContract = dystopiarouter.connect(wallet);
   const tokenBalance = await getTokenBalanceWallet(
     LPTokenAddress,
     WALLET_ADDRESS
@@ -61,22 +67,34 @@ async function calcLPTokensValue(
   return [LPToken1, LPToken2];
 }
 
-async function claimDYSTReward(wallet) {
-  const RewardProvider = new ethers.Contract(
-    DYSTRewardContract,
-    DYSTRewardABI,
-    web3Provider
+async function swapPolyNativeTokens(wallet, WALLET_ADDRESS) {
+  const amountDyst = await getTokenBalanceWallet(DystAddress, WALLET_ADDRESS);
+  const amountPen = await getTokenBalanceWallet(PenAddress, WALLET_ADDRESS);
+  await errCatcher(swapToken1ToToken2, [
+    DystAddress,
+    WmaticAddress,
+    amountDyst,
+    wallet,
+    WALLET_ADDRESS,
+  ]);
+  await errCatcher(swapToken1ToToken2, [
+    PenAddress,
+    WmaticAddress,
+    amountPen,
+    wallet,
+    WALLET_ADDRESS,
+  ]);
+  const amountWmatic = await getTokenBalanceWallet(
+    WmaticAddress,
+    WALLET_ADDRESS
   );
-  const gasPrice = await getGasPrice();
-  const rewardProviderContract = RewardProvider.connect(wallet);
-  rewardProviderContract
-    .claimFees({
-      gasPrice: gasPrice,
-      gasLimit: BigNumber.from("500000"),
-    })
-    .then(function (transaction) {
-      return transaction.wait();
-    });
+  await errCatcher(swapToken1ToToken2, [
+    WmaticAddress,
+    UsdcAddress,
+    amountWmatic,
+    wallet,
+    WALLET_ADDRESS,
+  ]);
 }
 
 async function swapToken1ToToken2(
@@ -86,7 +104,6 @@ async function swapToken1ToToken2(
   wallet,
   WALLET_ADDRESS
 ) {
-  //approveToken(Token1address, DystopiaRouterAddress, wallet);
   const dystopiarouter = new ethers.Contract(
     DystopiaRouterAddress,
     DystopiaRouterABI,
@@ -134,258 +151,8 @@ async function claimFeesReward(wallet) {
     });
 }
 
-async function swapInTargetProportion(WALLET_ADDRESS, WALLET_SECRET) {
-  const gasPrice = await getGasPrice();
-  const wallet = new ethers.Wallet(WALLET_SECRET, web3Provider);
-
-  //approveToken(Tocken1, DystopiaRouterAddress, wallet);
-
-  const dystopiarouter = new ethers.Contract(
-    DystopiaRouterAddress,
-    DystopiaRouterABI,
-    web3Provider
-  );
-
-  const dystopiarouterContract = dystopiarouter.connect(wallet);
-  const Token1WalletAmount = await getTokenBalanceWallet(
-    Tocken1,
-    WALLET_ADDRESS
-  );
-  const Token2WalletAmount = await getTokenBalanceWallet(
-    Tocken2,
-    WALLET_ADDRESS
-  );
-
-  const reserves = await dystopiarouterContract.getReserves(
-    Tocken1,
-    Tocken2,
-    false
-  );
-
-  const TokensLiquidity = Token2WalletAmount.mul(reserves[0])
-    .div(reserves[1])
-    .add(Token1WalletAmount);
-
-  const Token1Swap = TokensLiquidity.div(2).sub(Token1WalletAmount);
-  const maxSlippageCoeff = 1;
-  const currentTimestamp = Date.now();
-  //TODO: minswap ERROR
-  if (Token1Swap.lt(0)) {
-    let Token2ExpectedAmount = Token1Swap.mul(-1)
-      .mul(reserves[1])
-      .div(reserves[0])
-      .mul(100 - maxSlippageCoeff)
-      .div(100);
-
-    const ExpectedAmount = await dystopiarouterContract.getExactAmountOut(
-      Token1Swap.mul(-1),
-      Tocken1,
-      Tocken2,
-      true
-    );
-    if (Token2ExpectedAmount.gt(ExpectedAmount)) {
-      Token2ExpectedAmount = Token2ExpectedAmount.mul(98).div(100);
-    }
-
-    await dystopiarouterContract
-      .swapExactTokensForTokensSimple(
-        Token1Swap.mul(-1),
-        Token2ExpectedAmount,
-        Tocken1,
-        Tocken2,
-        true,
-        WALLET_ADDRESS,
-        currentTimestamp + 60,
-        { gasPrice: gasPrice, gasLimit: BigNumber.from("500000") }
-      )
-      .then(function (transaction) {
-        return transaction.wait();
-      });
-  } else {
-    const TokensLiquidity = Token1WalletAmount.mul(reserves[1])
-      .div(reserves[0])
-      .add(Token2WalletAmount);
-
-    const Token2Swap = TokensLiquidity.div(2).sub(Token2WalletAmount);
-
-    let Token1ExpectedAmount = Token2Swap.mul(-1)
-      .mul(reserves[0])
-      .div(reserves[1])
-      .mul(100 - maxSlippageCoeff)
-      .div(100);
-
-    const ExpectedAmount = await dystopiarouterContract.getExactAmountOut(
-      Token2Swap.mul(-1),
-      Tocken2,
-      Tocken1,
-      true
-    );
-    if (Token1ExpectedAmount.gt(ExpectedAmount)) {
-      Token1ExpectedAmount = Token1ExpectedAmount.mul(99).div(100);
-    }
-    await dystopiarouterContract
-      .swapExactTokensForTokensSimple(
-        Token2Swap.mul(-1),
-        Token1ExpectedAmount,
-        Tocken2,
-        Tocken1,
-        true,
-        WALLET_ADDRESS,
-        currentTimestamp + 60,
-        { gasPrice: gasPrice, gasLimit: BigNumber.from("500000") }
-      )
-      .then(function (transaction) {
-        return transaction.wait();
-      });
-  }
-}
-
-async function claimFeesReward(wallet) {
-  const RewardProvider = new ethers.Contract(
-    PoolToken,
-    FeesRewardABI,
-    web3Provider
-  );
-  const gasPrice = await getGasPrice();
-  const rewardProviderContract = RewardProvider.connect(wallet);
-  rewardProviderContract
-    .claimFees({
-      gasPrice: gasPrice,
-      gasLimit: BigNumber.from("500000"),
-    })
-    .then(function (transaction) {
-      return transaction.wait();
-    });
-}
-
-async function swapAndAdd(WALLET_ADDRESS, WALLET_SECRET) {
-  await swapInTargetProportion(WALLET_ADDRESS, WALLET_SECRET);
-  return await addAllLiquidity(WALLET_ADDRESS, WALLET_SECRET);
-}
-
-async function addAllLiquidity(WALLET_ADDRESS, WALLET_SECRET) {
-  const Token1WalletAmount = await getTokenBalanceWallet(
-    Tocken1,
-    WALLET_ADDRESS
-  );
-  const Token2WalletAmount = await getTokenBalanceWallet(
-    Tocken2,
-    WALLET_ADDRESS
-  );
-
-  return await addLiquidityToPool(
-    WALLET_SECRET,
-    WALLET_ADDRESS,
-    Token1WalletAmount,
-    Token2WalletAmount,
-    Token1WalletAmount.sub(90).div(100),
-    Token2WalletAmount.sub(90).div(100)
-  );
-}
-
-// add liquidity to required pool
-async function addLiquidityToPool(
-  WALLET_SECRET,
-  WALLET_ADDRESS,
-  amountADesired,
-  amountBDesired,
-  amountAMin,
-  amountBMin
-) {
-  const gasPrice = await getGasPrice();
-  const wallet = new ethers.Wallet(WALLET_SECRET, web3Provider);
-
-  //approveToken(Tocken1);
-
-  const dystopiarouter = new ethers.Contract(
-    DystopiaRouterAddress,
-    DystopiaRouterABI,
-    web3Provider
-  );
-
-  const dystopiarouterContract = dystopiarouter.connect(wallet);
-  const currentTimestamp = Date.now();
-
-  return await dystopiarouterContract
-    .addLiquidity(
-      Tocken1,
-      Tocken2,
-      false,
-      amountADesired,
-      amountBDesired,
-      amountAMin,
-      amountBMin,
-      WALLET_ADDRESS,
-      currentTimestamp + 60,
-      { gasPrice: gasPrice, gasLimit: BigNumber.from("500000") }
-    )
-    .then(function (transaction) {
-      return transaction.wait();
-    });
-}
-
-// remove liquidity from pool and claim fees
-async function removeLiquidityFromPool(WALLET_ADDRESS, WALLET_SECRET) {
-  const gasPrice = await getGasPrice();
-
-  const wallet = new ethers.Wallet(WALLET_SECRET, web3Provider);
-
-  const dystopiarouter = new ethers.Contract(
-    DystopiaRouterAddress,
-    DystopiaRouterABI,
-    web3Provider
-  );
-
-  const dystopiarouterContract = dystopiarouter.connect(wallet);
-  const currentTimestamp = Date.now();
-  const lptokens = await calcLPTokensValue(
-    PoolToken,
-    dystopiarouterContract,
-    WALLET_ADDRESS
-  );
-
-  //claimDYSTReward(wallet);
-  //claimFeesReward(wallet);
-
-  //approveoken(PoolToken, dystopiarouterContract, wallet);
-  const liquidity = await dystopiarouterContract.quoteAddLiquidity(
-    Tocken1,
-    Tocken2,
-    false,
-    lptokens[0],
-    lptokens[1]
-  );
-
-  return await dystopiarouterContract
-    .removeLiquidity(
-      Tocken1,
-      Tocken2,
-      false,
-      liquidity[2],
-      lptokens[0].sub(98).div(100),
-      lptokens[1].sub(98).div(100),
-      WALLET_ADDRESS,
-      currentTimestamp + 60,
-      { gasPrice: gasPrice, gasLimit: BigNumber.from("500000") }
-    )
-    .then(function (transaction) {
-      return transaction.wait();
-    });
-}
-
-//swapAndAdd();
-//addAllLiquidity();
-//removeLiquidityFromPool();
-// const wallet = new ethers.Wallet(WALLET_SECRET, web3Provider);
-//claimFeesReward(wallet);
-
 module.exports = {
-  swapAndAdd,
-  addAllLiquidity,
-  removeLiquidityFromPool,
-  claimFeesReward,
   swapToken1ToToken2,
-  swapInTargetProportion,
   calcLPTokensValue,
-  removeLiquidityFromPool,
+  swapPolyNativeTokens,
 };

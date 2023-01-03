@@ -16,7 +16,7 @@ const timer = (ms) => new Promise((res) => setTimeout(res, ms));
 
 async function gasPriceAwaiter() {
   let gasPrice = await getGasPrice();
-  while (gasPrice / 10 ** 9 > 60) {
+  while (gasPrice / 10 ** 9 > 70) {
     console.log(gasPrice / 10 ** 9 + "gwei");
     console.log("waiting for normal gas price");
     await timer(180000);
@@ -44,10 +44,28 @@ async function depositLpAndStake(wallet, PoolToken) {
       return transaction.wait();
     });
 }
+async function claimStakingRewards(wallet, PoolToken) {
+  let gasPrice = await gasPriceAwaiter();
+
+  const PenroseCommunication = new ethers.Contract(
+    PenroseProxy,
+    UserProxyInterfaceABI,
+    web3Provider
+  );
+  const penroseContract = PenroseCommunication.connect(wallet);
+
+  return await penroseContract
+    .claimAllStakingRewards({
+      gasPrice: gasPrice,
+      gasLimit: BigNumber.from("5000000"),
+    })
+    .then(function (transaction) {
+      return transaction.wait();
+    });
+}
 
 async function unstakeLpWithdrawAndClaim(wallet, PoolToken) {
   let gasPrice = await gasPriceAwaiter();
-  //approveToken(PoolToken, PenroseProxy, wallet);
 
   const PenroseCommunication = new ethers.Contract(
     PenroseProxy,
@@ -69,4 +87,5 @@ async function unstakeLpWithdrawAndClaim(wallet, PoolToken) {
 module.exports = {
   depositLpAndStake,
   unstakeLpWithdrawAndClaim,
+  claimStakingRewards,
 };

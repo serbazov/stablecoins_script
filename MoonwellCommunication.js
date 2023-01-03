@@ -10,20 +10,32 @@ const web3Provider = new ethers.providers.StaticJsonRpcProvider(providerURL, {
 const { getTokenBalanceWallet } = require("./Utilities");
 const Comptroller = "0x0b7a0EAA884849c6Af7a129e899536dDDcA4905E".toLowerCase();
 const ComptrollerAbi = require("./abi/ComptrollerABI.json");
+const { errCatcher } = require("./Utilities");
 
 async function ClaimReward(wallet, WALLET_ADDRESS) {
+  await errCatcher(ClaimMFAM, [wallet, WALLET_ADDRESS]);
+  await errCatcher(ClaimMOVR, [wallet, WALLET_ADDRESS]);
+}
+async function ClaimMOVR(wallet, WALLET_ADDRESS) {
   const RewardProvider = new ethers.Contract(
     Comptroller,
     ComptrollerAbi,
     web3Provider
   );
-  //const gasPrice = await getGasPrice();
   const rewardProviderContract = RewardProvider.connect(wallet);
   const createReceiptMovr = await rewardProviderContract.claimReward(
     1,
     WALLET_ADDRESS
   );
   await createReceiptMovr.wait();
+}
+async function ClaimMFAM(wallet, WALLET_ADDRESS) {
+  const RewardProvider = new ethers.Contract(
+    Comptroller,
+    ComptrollerAbi,
+    web3Provider
+  );
+  const rewardProviderContract = RewardProvider.connect(wallet);
   const createReceiptMfam = await rewardProviderContract.claimReward(
     0,
     WALLET_ADDRESS

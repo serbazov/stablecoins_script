@@ -18,6 +18,7 @@ const web3ProviderMoon = new ethers.providers.StaticJsonRpcProvider(
   }
 );
 const { GoogleSpreadsheet } = require("google-spreadsheet");
+const { Strategy } = require("./PositionManager");
 const {
   getTokenBalanceWallet,
   getCurrentPrice,
@@ -89,117 +90,15 @@ async function runBot(args) {
   const days = args[0];
   const WALLET_ADDRESS = args[1];
   const WALLET_SECRET = args[2];
-  const wallet = new ethers.Wallet(WALLET_SECRET, web3Provider);
-  const walletOpt = new ethers.Wallet(WALLET_SECRET, web3ProviderOpt);
-  const walletMoon = new ethers.Wallet(WALLET_SECRET, web3ProviderMoon);
-  await doc.useServiceAccountAuth(creds);
-  const sheet = await doc.addSheet({
-    headerValues: [
-      "Time",
-      "UnixTime",
-      "PolygonUSDCClaimed",
-      "MaticGasSpent",
-      "VelodromeUSDCClaimed",
-      "EthGasSpent",
-      "MoonriverMFAMClaimed",
-      "MoonriverMOVRIncome",
-    ],
-  });
-
+  let StableCoinsStrategy = new Strategy(WALLET_ADDRESS, WALLET_SECRET, days);
+  await StableCoinsStrategy.InitSheet();
   while (true) {
-    console.log("start");
+    console.log("awaiting");
     await timer(1000 * 60 * 60 * 24 * days);
-    const UsdcInitPolygon = await getTokenBalanceWallet(
-      UsdcAddress,
-      WALLET_ADDRESS
-    );
-    const UsdcInitOpt = await getTokenBalanceWallet(
-      UsdcOptToken,
-      WALLET_ADDRESS,
-      "optimism"
-    );
-
-    const MaticInit = await getTokenBalanceWallet(MaticAddress, WALLET_ADDRESS);
-    const EthInit = await web3ProviderOpt.getBalance(WALLET_ADDRESS);
-    const MOVRbalance = await web3ProviderMoon.getBalance(WALLET_ADDRESS);
-    await ClaimReward(walletMoon, WALLET_ADDRESS);
-    await unstakeLpWithdrawAndClaim(wallet, PoolToken);
-    await claimVeloReward(walletOpt, WALLET_ADDRESS);
-    await timer(1000 * 60 * 5);
-    const MOVRbalance2 = await web3ProviderMoon.getBalance(WALLET_ADDRESS);
-    console.log("LP unstaked");
-    const amountDyst = await getTokenBalanceWallet(DystAddress, WALLET_ADDRESS);
-    const amountPen = await getTokenBalanceWallet(PenAddress, WALLET_ADDRESS);
-    const amountVelo = await getTokenBalanceWallet(
-      VeloToken,
-      WALLET_ADDRESS,
-      "optimism"
-    );
-    const amountMFAM = await getTokenBalanceWallet(
-      MFAMToken,
-      WALLET_ADDRESS,
-      "moonriver"
-    );
-    await swapToken1ToToken2velo(
-      VeloToken,
-      UsdcOptToken,
-      amountVelo,
-      walletOpt,
-      WALLET_ADDRESS
-    );
-    await swapToken1ToToken2(
-      DystAddress,
-      WmaticAddress,
-      amountDyst,
-      wallet,
-      WALLET_ADDRESS
-    );
-    await swapToken1ToToken2(
-      PenAddress,
-      WmaticAddress,
-      amountPen,
-      wallet,
-      WALLET_ADDRESS
-    );
-    const amountWmatic = await getTokenBalanceWallet(
-      WmaticAddress,
-      WALLET_ADDRESS
-    );
-    await swapToken1ToToken2(
-      WmaticAddress,
-      UsdcAddress,
-      amountWmatic,
-      wallet,
-      WALLET_ADDRESS
-    );
-    const MovrSwap = MOVRbalance2.sub(MOVRbalance);
-    await swapMFAM(walletMoon, WALLET_ADDRESS);
-    if (MovrSwap.gt(0)) {
-      await swapMovr(walletMoon, MovrSwap);
-    }
-    await depositLpAndStake(wallet, PoolToken);
-    const UsdcEndPolygon = await getTokenBalanceWallet(
-      UsdcAddress,
-      WALLET_ADDRESS
-    );
-    const UsdcEndOpt = await getTokenBalanceWallet(
-      UsdcOptToken,
-      WALLET_ADDRESS,
-      "optimism"
-    );
-    const MaticEnd = await getTokenBalanceWallet(MaticAddress, WALLET_ADDRESS);
-    const EthEnd = await web3ProviderOpt.getBalance(WALLET_ADDRESS);
-    await sheet.addRow({
-      Time: Date(Date.now),
-      UnixTime: Date.now(),
-      PolygonUSDCClaimed:
-        (UsdcEndPolygon - UsdcInitPolygon) / 10 ** UsdcDecimals,
-      MaticGasSpent: (MaticInit - MaticEnd) / 10 ** WmaticDecimals,
-      VelodromeUSDCClaimed: (UsdcEndOpt - UsdcInitOpt) / 10 ** UsdcDecimals,
-      EthGasSpent: (EthInit - EthEnd) / 10 ** EthDecimals,
-      MoonriverMFAMClaimed: amountMFAM / 10 ** 18,
-      MoonriverMOVRIncome: MovrSwap / 10 ** 18,
-    });
+    await StableCoinsStrategy.InitData();
+    await StableCoinsStrategy.ClaimRewards();
+    await StableCoinsStrategy.SwapTokens();
+    await StableCoinsStrategy.SaveData();
   }
 }
 
