@@ -14,13 +14,6 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "claimStakingRewards",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "address",

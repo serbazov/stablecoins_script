@@ -30,6 +30,21 @@ async function getGasPrice() {
     .then((response) => response.json())
     .then((json) => BigNumber.from(Math.round(json.standard.maxFee * 10 ** 9)));
 }
+
+const timer = (ms) => new Promise((res) => setTimeout(res, ms));
+
+async function errCatcher(f, arguments) {
+  doLoop = true;
+  do {
+    try {
+      return await f.apply(this, arguments);
+    } catch (err) {
+      console.log(err);
+      await timer(180000);
+    }
+  } while (doLoop);
+}
+
 async function getCurrentPrice(
   // how much token2 cost in token1
   Token1,
@@ -55,14 +70,21 @@ async function getCurrentPrice(
   );
 }
 
+/**
+ * Get token balance on wallet
+ * @param {String} TokenAddress
+ * @param {String} wallet_address
+ * @param {String} network
+ * @returns {BigNumber} tokenBalance
+ */
 async function getTokenBalanceWallet(
   TokenAddress,
-  WALLET_ADDRESS,
+  wallet_address,
   network = "polygon"
 ) {
   if (network == "polygon") {
     const Token = new ethers.Contract(TokenAddress, ERC20ABI, web3Provider);
-    const tokenBalance = await Token.balanceOf(WALLET_ADDRESS);
+    const tokenBalance = await Token.balanceOf(wallet_address);
     return tokenBalance;
   }
   if (network == "optimism") {
@@ -71,7 +93,7 @@ async function getTokenBalanceWallet(
       ERC20ABI,
       web3ProviderOptimism
     );
-    const tokenBalance = await Token.balanceOf(WALLET_ADDRESS);
+    const tokenBalance = await Token.balanceOf(wallet_address);
     return tokenBalance;
   }
   if (network == "moonriver") {
@@ -80,20 +102,32 @@ async function getTokenBalanceWallet(
       ERC20ABI,
       web3ProviderMoonriver
     );
-    const tokenBalance = await Token.balanceOf(WALLET_ADDRESS);
+    const tokenBalance = await Token.balanceOf(wallet_address);
     return tokenBalance;
   }
 }
+/**
+ * Find out what total supply of the tokem. Operate only in Polygon network
+ * @param {String} TokenAddress
+ * @returns {BigNumber} TotalSupply
+ */
 async function getTotalTokenSupply(TokenAddress) {
   const Token = new ethers.Contract(TokenAddress, ERC20ABI, web3Provider);
   totalSupply = await Token.totalSupply();
   return totalSupply;
 }
 
+/**
+ * Approving tokens to contracts. Appoving max amount straightaway
+ * @param {String} TokenAddress Address of the token, that you want to approve
+ * @param {String} ContractAddress Address of the contract, that you want to approve your token for
+ * @param {String} Wallet Wallet in the needed network with tokens you want to approve
+ * @param {String} network (optional) Network
+ */
 async function approveToken(
   TokenAddress,
   ContractAddress,
-  ConnectedWallet,
+  Wallet,
   network = "polygon"
 ) {
   if (network == "polygon") {
@@ -104,7 +138,7 @@ async function approveToken(
     );
     const gasPrice = await getGasPrice();
     await tokenContract
-      .connect(ConnectedWallet)
+      .connect(Wallet)
       .approve(ContractAddress, ethers.constants.MaxUint256, {
         gasPrice: gasPrice,
         gasLimit: BigNumber.from("1000000"),
@@ -120,7 +154,7 @@ async function approveToken(
       web3ProviderOptimism
     );
     await tokenContract
-      .connect(ConnectedWallet)
+      .connect(Wallet)
       .approve(ContractAddress, ethers.constants.MaxUint256, {
         gasPrice: "5000000",
         gasLimit: "6000000",
@@ -136,7 +170,7 @@ async function approveToken(
       web3ProviderMoonriver
     );
     await tokenContract
-      .connect(ConnectedWallet)
+      .connect(Wallet)
       .approve(ContractAddress, ethers.constants.MaxUint256, {
         gasLimit: "500000",
       })
@@ -152,4 +186,5 @@ module.exports = {
   getTotalTokenSupply,
   approveToken,
   getCurrentPrice,
+  errCatcher,
 };

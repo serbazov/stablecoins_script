@@ -22,6 +22,8 @@ const VelodromeRouter =
   "0x9c12939390052919aF3155f41Bf4160Fd3666A6f".toLowerCase();
 const VeloToken = "0x3c8B650257cFb5f272f799F5e2b4e65093a11a05".toLowerCase();
 const UsdcToken = "0x7F5c764cBc14f9669B88837ca1490cCa17c31607".toLowerCase();
+const UsdcOptToken = "0x7F5c764cBc14f9669B88837ca1490cCa17c31607".toLowerCase();
+const { errCatcher } = require("./Utilities");
 var args = process.argv.slice(2);
 
 async function allApproves(args) {
@@ -73,6 +75,21 @@ async function claimVeloReward(wallet, WALLET_ADDRESS) {
     });
 }
 
+async function swapVeloNativeTokens(walletOpt, WALLET_ADDRESS) {
+  const amountVelo = await getTokenBalanceWallet(
+    VeloToken,
+    WALLET_ADDRESS,
+    "optimism"
+  );
+  await errCatcher(swapToken1ToToken2velo, [
+    VeloToken,
+    UsdcOptToken,
+    amountVelo,
+    walletOpt,
+    WALLET_ADDRESS,
+  ]);
+}
+
 async function swapToken1ToToken2velo(
   Token1address,
   Token2address,
@@ -80,7 +97,6 @@ async function swapToken1ToToken2velo(
   wallet,
   WALLET_ADDRESS
 ) {
-  //approveToken(Token1address, DystopiaRouterAddress, wallet);
   const velorouter = new ethers.Contract(
     VelodromeRouter,
     VelodromeRouterABI,
@@ -93,16 +109,21 @@ async function swapToken1ToToken2velo(
     Token2address
   );
   const currentTimestamp = Date.now();
+  const AmountOutMin = ethers.utils.parseUnits(
+    // 5% slippage is ok for this pair
+    ((ExpectedAmount.amount * 0.95) / 10 ** 6).toFixed(6),
+    6
+  );
   await velorouterContract
     .swapExactTokensForTokensSimple(
       amount,
-      ExpectedAmount.amount,
+      AmountOutMin,
       Token1address,
       Token2address,
-      ExpectedAmount.sable,
+      ExpectedAmount.stable, // false to-do find out
       WALLET_ADDRESS,
       currentTimestamp + 60,
-      { gasPrice: "5000000", gasLimit: "6000000" }
+      { gasPrice: "5000000", gasLimit: "1000000" }
     )
     .then(function (transaction) {
       return transaction.wait();
@@ -130,4 +151,8 @@ async function swapToken1ToToken2velo(
 
 // runVelodrome(args);
 //allApproves(args);
-module.exports = { swapToken1ToToken2velo, claimVeloReward };
+module.exports = {
+  swapToken1ToToken2velo,
+  claimVeloReward,
+  swapVeloNativeTokens,
+};

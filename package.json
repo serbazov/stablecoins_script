@@ -7,6 +7,7 @@
     "ethers": "^5.7.1",
     "fetch": "^1.1.0",
     "google-spreadsheet": "^3.3.0",
+    "googleapis": "^110.0.0",
     "node-fetch": "^1.7.3",
     "web3": "^1.8.0"
   }

@@ -9,6 +9,7 @@ const MFAM = "0xBb8d88bcD9749636BC4D2bE22aaC4Bb3B01A58F1".toLowerCase();
 const USDC = "0xe3f5a90f9cb311505cd691a46596599aa1a0ad7d".toLowerCase();
 const SOLAR = "0x6bD193Ee6D2104F14F94E2cA6efefae561A4334B".toLowerCase();
 const BUSD = "0x5D9ab5522c64E1F6ef5e3627ECCc093f56167818".toLowerCase();
+const MFAMToken = "0xBb8d88bcD9749636BC4D2bE22aaC4Bb3B01A58F1".toLowerCase();
 const FraxDecimals = 18;
 const SolarFactory = "0x049581aEB6Fe262727f290165C29BDAB065a1B68".toLowerCase();
 const ethers = require("ethers"); // Load Ethers library
@@ -20,12 +21,10 @@ const web3Provider = new ethers.providers.StaticJsonRpcProvider(providerURL, {
 });
 const fetch = require("node-fetch"); // node-fetch@1.7.3
 const { BigNumber } = require("ethers");
-const WALLET_SECRET =
-  "a89230e9695a6dabb9027341fba7a7b1dd8a378a6fd2ddcf15034029f54d99dd".toLowerCase();
 const Movrurl = "https://www.binance.com/api/v3/ticker/price?symbol=MOVRUSDT";
 const MovrDecimals = 18;
 
-const { getTokenBalanceWallet } = require("./Utilities");
+const { getTokenBalanceWallet, errCatcher } = require("./Utilities");
 
 async function getMovrPrice() {
   return await fetch(Movrurl)
@@ -57,7 +56,7 @@ async function getPrice(Token, wallet) {
   return MFAMprice;
 }
 
-async function swapMovr(wallet, swapAmount) {
+async function swapMovr(wallet, swapAmount, WALLET_ADDRESS) {
   const Swapper = new ethers.Contract(SolarRouter, SolarABI, web3Provider);
   const SwapperContract = Swapper.connect(wallet);
   const Movrprice = await getMovrPrice();
@@ -66,12 +65,12 @@ async function swapMovr(wallet, swapAmount) {
   const SwapAmount1 = ethers.utils.parseUnits(String(swapAmount), MovrDecimals);
   const path = [WMOVR, Frax];
   const currentTimestamp = Date.now();
-  const SendTransaction = await wallet.sendTransaction({
-    to: WMOVR,
-    value: SwapAmount1,
-    gasLimit: 500000,
-  });
-  await SendTransaction.wait();
+  // const SendTransaction = await wallet.sendTransaction({
+  //   to: WMOVR,
+  //   value: SwapAmount1,
+  //   gasLimit: 500000,
+  // });
+  // await SendTransaction.wait();
   const createReceipt = await SwapperContract.swapExactTokensForTokens(
     SwapAmount1,
     AmountOut1,
@@ -110,13 +109,25 @@ async function swapMFAM(wallet, WALLET_ADDRESS) {
   await createReceipt.wait();
 }
 
+async function swapMovrNativeTokens(walletMoon, WALLET_ADDRESS, MOVRbalance) {
+  await errCatcher(swapMFAM, [walletMoon, WALLET_ADDRESS]);
+  const MOVRbalance2 = await web3Provider.getBalance(WALLET_ADDRESS);
+  const MovrSwap = (MOVRbalance2.sub(MOVRbalance) / 10 ** MovrDecimals).toFixed(
+    MovrDecimals
+  );
+  // if (MovrSwap > 0) {
+  //   await errCatcher(swapMovr, [walletMoon, MovrSwap, WALLET_ADDRESS]);
+  // }
+}
+
 // async function run() {
+
 //   const wallet = new ethers.Wallet(WALLET_SECRET, web3Provider);
-//   const amountToSwap = 0.01;
+//   const amountToSwap = 0.001;
 //   await swapMovr(wallet, amountToSwap);
 //   //await swapMFAM(wallet);
 // }
 
 // run();
 
-module.exports = { swapMFAM, swapMovr };
+module.exports = { swapMFAM, swapMovr, swapMovrNativeTokens };
